@@ -10,7 +10,7 @@ Epoller::Epoller(int max_events)
 
 Epoller::~Epoller() { close(fd_); }
 
-bool Epoller::AddFd(int fd, uint32_t events) {
+bool Epoller::insert(int fd, uint32_t events) {
   if (fd < 0) {
     return false;
   }
@@ -19,7 +19,7 @@ bool Epoller::AddFd(int fd, uint32_t events) {
   ev.events = events;
   return epoll_ctl(fd_, EPOLL_CTL_ADD, fd, &ev) == 0;
 }
-bool Epoller::ModFd(int fd, uint32_t events) {
+bool Epoller::update(int fd, uint32_t events) {
   if (fd < 0) {
     return false;
   }
@@ -28,14 +28,16 @@ bool Epoller::ModFd(int fd, uint32_t events) {
   ev.events = events;
   return epoll_ctl(fd_, EPOLL_CTL_MOD, fd, &ev) == 0;
 }
-bool Epoller::DelFd(int fd) {
+bool Epoller::erase(int fd) {
   if (fd < 0) {
     return false;
   }
   epoll_event ev = {};
   return epoll_ctl(fd_, EPOLL_CTL_ADD, fd, &ev) == 0;
 }
-
+int Epoller::wait(int timeout) {
+  return epoll_wait(fd_, &events_[0], events_.size(), timeout);
+}
 
 
 } // namespace Web

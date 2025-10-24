@@ -7,6 +7,9 @@
 #include <fstream>
 #include <string_view>
 #include <utility>
+#include <condition_variable>
+#include <atomic>
+#include <thread>
 
 namespace {
 const char *Levels[] = {"[DEBUG]", "[INFO]", "[WARN]", "[ERROR]", "[FATAL]"};
@@ -29,27 +32,29 @@ public:
     return false;
   }
   template <class... Args>
-  void write_log(int level, std::string_view format, Args &&...args) {
+  void write_log(int level, std::format_string<Args...> format, Args &&...args) {
     auto current_timestamp = std::chrono::system_clock().now();
-    // level > 0 && level < 5
-    std::lock_guard lk(this->mutex_);
-    count_++;
-    if (count_ % split_lines_ == 0) {
-      fs_.flush();
-      fs_.close();
-      std::string newname = this->log_name_;
-      newname += std::format("_{}", count_ / split_lines_);
-      fs_ = open_new_file(current_timestamp, newname);
+    std::string res = std::format("[{0:%T}] ", current_timestamp) +
+                      std::format("{:7}", Levels[level]) +
+                      std::format(format, std::forward<Args>(args)...);
+    {
+      std::lock_guard lk(this->mutex_);
+      count_++;
+      if (count_ % split_lines_ == 0) {
+        fs_.flush();
+        fs_.close();
+        std::string newname = this->log_name_;
+        newname += std::format("_{}", count_ / split_lines_);
+        fs_ = open_new_file(current_timestamp, newname);
+      }
+      if (!is_async_) {
+        fs_ << res << '\n';
+        return;
+      }
     }
-    std::string res;
-    res = std::format("[{0:%T}] ", current_timestamp) +
-          std::format("{:7}", Levels[level]) +
-          std::format(format, std::forward(args)...);
-    if (is_async_) {
-      queue_.push_back(std::move(res));
-    } else {
-      fs_ << res << '\n';
-    }
+    // Async path: increase pending and enqueue
+    pending_.fetch_add(1, std::memory_order_relaxed);
+    queue_.push_back(std::move(res));
   }
 
   void flush(void);
@@ -59,30 +64,36 @@ public:
   Logger& operator=(const Logger&) = delete;
   Logger& operator=(Logger&&) = delete;
 
+  // Public destructor so std::unique_ptr can delete the singleton at exit
+  ~Logger();
+
 private:
   Logger(const char *file_name, bool close_log, int log_buf_size,
          int split_lines, int max_queue_size);
-  ~Logger();
   std::fstream
   open_new_file(const std::chrono::time_point<std::chrono::system_clock> &tp,
                 std::string_view name);
   void async_write_log() {
-    std::string single_log;
-    // 从阻塞队列中取出一个日志string，写入文件
-    while (!queue_.empty()) {
-      std::lock_guard<std::mutex> lk(mutex_);
-      auto log = queue_.front();
-      queue_.pop_front();
-      fs_ << log << '\n';
+    std::string log;
+    while (queue_.pop_front(log)) {
+      {
+        std::lock_guard<std::mutex> lk(mutex_);
+        fs_ << log << '\n';
+      }
+      auto left = pending_.fetch_sub(1, std::memory_order_acq_rel) - 1;
+      if (left == 0) {
+        std::lock_guard<std::mutex> lk(flush_mtx_);
+        cv_flush_.notify_all();
+      }
     }
   }
 
 private:
   static std::unique_ptr<Logger> ptr_;
-  bool close_;
+  [[maybe_unused]] bool close_;
   std::string log_name_;             // log文件名
   int split_lines_;                  // 日志最大行数
-  int log_buffer_size_;              // 日志缓冲区大小
+  [[maybe_unused]] int log_buffer_size_;              // 日志缓冲区大小
   int max_queue_size_;               // 队列大小
   std::string dir_name_;             // 路径名
   size_t count_;                     // 日志行数记录
@@ -90,22 +101,26 @@ private:
   bool is_async_;                    // 是否同步标志位
   std::mutex mutex_;
   std::fstream fs_;
+  // For flush synchronization in async mode
+  std::condition_variable cv_flush_;
+  std::mutex flush_mtx_;
+  std::atomic<size_t> pending_{0};
 };
 
-template <class... Arg> void LOG_DEBUG(std::string_view format, Arg &&...args) {
-  Logger::get_instance()->write_log(0, format, std::forward(args)...);
+template <class... Arg> void LOG_DEBUG(std::format_string<Arg...> format, Arg &&...args) {
+  Logger::get_instance()->write_log(0, format, std::forward<Arg>(args)...);
 }
-template <class... Arg> void LOG_INFO(std::string_view format, Arg &&...args) {
-  Logger::get_instance()->write_log(1, format, std::forward(args)...);
+template <class... Arg> void LOG_INFO(std::format_string<Arg...> format, Arg &&...args) {
+  Logger::get_instance()->write_log(1, format, std::forward<Arg>(args)...);
 }
-template <class... Arg> void LOG_WARN(std::string_view format, Arg &&...args) {
-  Logger::get_instance()->write_log(2, format, std::forward(args)...);
+template <class... Arg> void LOG_WARN(std::format_string<Arg...> format, Arg &&...args) {
+  Logger::get_instance()->write_log(2, format, std::forward<Arg>(args)...);
 }
-template <class... Arg> void LOG_ERROR(std::string_view format, Arg &&...args) {
-  Logger::get_instance()->write_log(3, format, std::forward(args)...);
+template <class... Arg> void LOG_ERROR(std::format_string<Arg...> format, Arg &&...args) {
+  Logger::get_instance()->write_log(3, format, std::forward<Arg>(args)...);
 }
-template <class... Arg> void LOG_FATAL(std::string_view format, Arg &&...args) {
-  Logger::get_instance()->write_log(4, format, std::forward(args)...);
+template <class... Arg> void LOG_FATAL(std::format_string<Arg...> format, Arg &&...args) {
+  Logger::get_instance()->write_log(4, format, std::forward<Arg>(args)...);
 }
 
 #endif

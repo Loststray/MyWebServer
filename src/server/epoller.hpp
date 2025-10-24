@@ -13,10 +13,10 @@ private:
 public:
   Epoller(int max_events = MAX_EVENTS);
   ~Epoller();
-  bool AddFd(int fd,uint32_t events);
-  bool ModFd(int fd,uint32_t events);
-  bool DelFd(int fd);
-  int Wait(int timeout);
+  bool insert(int fd,uint32_t events);
+  bool update(int fd,uint32_t events);
+  bool erase(int fd);
+  int wait(int timeout);
 };
 
 } // namespace Web

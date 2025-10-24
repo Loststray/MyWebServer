@@ -10,6 +10,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <thread>
 
 std::unique_ptr<Logger> Logger::ptr_ = nullptr;
 
@@ -29,8 +30,17 @@ std::fstream Logger::open_new_file(
 }
 
 void Logger::flush() {
-  std::lock_guard lk(this->mutex_);
-  fs_.flush();
+  if (is_async_) {
+    std::unique_lock<std::mutex> lk(flush_mtx_);
+    cv_flush_.wait(lk, [this] {
+      return pending_.load(std::memory_order_acquire) == 0;
+    });
+    std::lock_guard<std::mutex> io_lk(this->mutex_);
+    fs_.flush();
+  } else {
+    std::lock_guard<std::mutex> io_lk(this->mutex_);
+    fs_.flush();
+  }
 }
 
 Logger::Logger(const char *file_name, bool close_log, int log_buf_size,
@@ -39,10 +49,12 @@ Logger::Logger(const char *file_name, bool close_log, int log_buf_size,
       log_buffer_size_(log_buf_size), max_queue_size_(max_queue_size),
       queue_(max_queue_size_) {
   if (max_queue_size_ > 0) {
-    std::thread t([this] { this->async_write_log(); });
-    t.detach();
     is_async_ = true;
+    auto worker = std::thread([this] { this->async_write_log(); });
+    worker.detach();
   }
   fs_ = open_new_file(std::chrono::system_clock::now(), file_name);
 }
-Logger::~Logger() {}
+Logger::~Logger() {
+  flush();
+}

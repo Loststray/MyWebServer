@@ -9,11 +9,11 @@ private:
   std::unique_ptr<T[]> array_;
   int capacity_, head_, tail_, size_;
   bool stop_;
-  std::condition_variable producer_, consumer_;
+  std::condition_variable producer_, consumer_, empty_;
   std::mutex mtx_;
 
 public:
-  MessageBuffer(int capacity = 1 << 10) : capacity_(capacity) {
+  MessageBuffer(int capacity = 1 << 10) : capacity_(capacity), stop_(false) {
     array_ = std::make_unique<T[]>(capacity);
     head_ = tail_ = size_ = 0;
   }
@@ -24,6 +24,7 @@ public:
     }
     producer_.notify_all();
     consumer_.notify_all();
+    empty_.notify_all();
   }
   void clear() {
     std::lock_guard<std::mutex> lk(mtx_);
@@ -41,8 +42,10 @@ public:
     array_[tail_] = std::forward<T>(w);
     tail_ = (tail_ + 1) % capacity_;
     size_++;
+    consumer_.notify_one();
+    return true;
   }
-  bool pop_front() {
+  bool pop_front(T &w) {
     std::unique_lock<std::mutex> lk(mtx_);
     if (size_ == 0) {
       producer_.notify_all();
@@ -51,9 +54,18 @@ public:
         return false;
       }
     }
+    w = array_[head_];
     head_ = (head_ + 1) % capacity_;
     size_--;
+    if (size_ == 0) {
+      empty_.notify_all();
+    }
     return true;
+  }
+  // Block until the buffer becomes empty
+  void wait_till_empty() {
+    std::unique_lock<std::mutex> lk(mtx_);
+    empty_.wait(lk, [&]() { return size_ == 0 || stop_; });
   }
   int size() {
     std::lock_guard<std::mutex> lk(mtx_);
