@@ -46,17 +46,19 @@ public:
              std::string *error_msg = nullptr);
 
   // Convenience overload returning the whole result by value.
-  std::optional<QueryResult> query(std::string_view sql, std::string *error_msg = nullptr) {
+  std::optional<QueryResult> query(std::string_view sql,
+                                   std::string *error_msg = nullptr) {
     QueryResult r;
-    if (!query(sql, r, error_msg)) return std::nullopt;
+    if (!query(sql, r, error_msg))
+      return std::nullopt;
     return r;
   }
 
   ~SQLite();
 
 private:
-  explicit SQLite(const std::string &db_path, int read_pool_size, bool enable_wal,
-                  int busy_timeout_ms);
+  explicit SQLite(const std::string &db_path, int read_pool_size,
+                  bool enable_wal, int busy_timeout_ms);
 
   // Internal helpers
   static std::string last_sqlite_error(sqlite3 *db, int rc);

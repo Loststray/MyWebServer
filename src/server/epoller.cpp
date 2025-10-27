@@ -1,5 +1,6 @@
 #include "epoller.hpp"
 #include <cstdint>
+#include <fcntl.h>
 #include <sys/epoll.h>
 #include <unistd.h>
 namespace Web {
@@ -32,12 +33,10 @@ bool Epoller::erase(int fd) {
   if (fd < 0) {
     return false;
   }
-  epoll_event ev = {};
-  return epoll_ctl(fd_, EPOLL_CTL_ADD, fd, &ev) == 0;
+  return epoll_ctl(fd_, EPOLL_CTL_ADD, fd, NULL) == 0;
 }
 int Epoller::wait(int timeout) {
   return epoll_wait(fd_, &events_[0], events_.size(), timeout);
 }
-
 
 } // namespace Web

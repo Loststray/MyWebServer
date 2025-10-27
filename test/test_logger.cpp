@@ -17,8 +17,7 @@ int main() {
   fs::create_directories("log", ec);
 
   // Initialize logger singleton
-  bool created =
-      Logger::init("unit_test", /*close_log=*/false, 8192, 100, 1024);
+  bool created = Logger::init("unit_test", /*close_log=*/false, 100, 1024);
   if (!created && Logger::get_instance() == nullptr) {
     std::cerr << "Logger init failed" << std::endl;
     return 1;

@@ -13,10 +13,11 @@ private:
 public:
   Epoller(int max_events = MAX_EVENTS);
   ~Epoller();
-  bool insert(int fd,uint32_t events);
-  bool update(int fd,uint32_t events);
+  bool insert(int fd, uint32_t events);
+  bool update(int fd, uint32_t events);
   bool erase(int fd);
   int wait(int timeout);
+  epoll_event &operator[](const size_t &x) { return events_[x]; }
 };
 
 } // namespace Web

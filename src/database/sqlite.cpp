@@ -177,8 +177,7 @@ bool SQLite::execute(std::string_view sql, std::string *error_msg) {
   // read. Not required, but helps avoid misuse.
   int rc = SQLITE_OK;
   sqlite3_stmt *stmt = nullptr;
-  rc = sqlite3_prepare_v2(write_db_, std::string(sql).c_str(), -1, &stmt,
-                          nullptr);
+  rc = sqlite3_prepare_v2(write_db_, sql.data(), -1, &stmt, nullptr);
   if (rc != SQLITE_OK) {
     if (error_msg)
       *error_msg = last_sqlite_error(write_db_, rc);
@@ -205,7 +204,7 @@ bool SQLite::query(std::string_view sql, QueryResult &out,
   sqlite3 *db = read_dbs_[static_cast<size_t>(idx)];
 
   sqlite3_stmt *stmt = nullptr;
-  int rc = sqlite3_prepare_v2(db, std::string(sql).c_str(), -1, &stmt, nullptr);
+  int rc = sqlite3_prepare_v2(db, sql.data(), -1, &stmt, nullptr);
   if (rc != SQLITE_OK) {
     if (error_msg)
       *error_msg = last_sqlite_error(db, rc);

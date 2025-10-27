@@ -1,7 +1,11 @@
 #ifndef CONFIG_HPP_
 #define CONFIG_HPP_
+namespace Web {
+
+enum class TriggerMode { EdgeTrigger = 0, LevelTrigger = 1 };
 
 class Config {
+
 public:
   Config();
   void parse_arg(int argc, char *argv[]);
@@ -16,10 +20,10 @@ public:
   int TRIGMode;
 
   // listenfd触发模式
-  int LISTENTrigmode;
+  TriggerMode LISTENTrigmode;
 
   // connfd触发模式
-  int CONNTrigmode;
+  TriggerMode CONNTrigmode;
 
   // 优雅关闭链接
   int OPT_LINGER;
@@ -31,10 +35,8 @@ public:
   int thread_num;
 
   // 是否关闭日志
-  int close_log;
-
-  // 并发模型选择
-  int actor_model;
+  bool close_log;
 };
+} // namespace Web
 
 #endif

@@ -1,6 +1,8 @@
 #include "config.hpp"
 #include <cstdlib>
 #include <unistd.h>
+namespace Web {
+
 Config::Config() {
   // 端口号
   PORT = 1453;
@@ -12,10 +14,10 @@ Config::Config() {
   TRIGMode = 0;
 
   // listenfd触发模式，默认LT
-  LISTENTrigmode = 0;
+  LISTENTrigmode = TriggerMode::LevelTrigger;
 
   // connfd触发模式，默认LT
-  CONNTrigmode = 0;
+  CONNTrigmode = TriggerMode::LevelTrigger;
 
   // 优雅关闭链接，默认不使用
   OPT_LINGER = 0;
@@ -27,10 +29,7 @@ Config::Config() {
   thread_num = 8;
 
   // 关闭日志,默认不关闭
-  close_log = 0;
-
-  // 并发模型,默认是proactor
-  actor_model = 0;
+  close_log = false;
 }
 
 void Config::parse_arg(int argc, char *argv[]) {
@@ -48,6 +47,12 @@ void Config::parse_arg(int argc, char *argv[]) {
     }
     case 'm': {
       TRIGMode = atoi(optarg);
+      if (TRIGMode & 1) {
+        CONNTrigmode = TriggerMode::EdgeTrigger;
+      }
+      if (TRIGMode & 2) {
+        LISTENTrigmode = TriggerMode::EdgeTrigger;
+      }
       break;
     }
     case 'o': {
@@ -66,12 +71,9 @@ void Config::parse_arg(int argc, char *argv[]) {
       close_log = atoi(optarg);
       break;
     }
-    case 'a': {
-      actor_model = atoi(optarg);
-      break;
-    }
     default:
       break;
     }
   }
 }
+} // namespace Web

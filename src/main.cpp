@@ -1,7 +1,6 @@
-#include <bits/stdc++.h>
 #include "config.hpp"
+#include <bits/stdc++.h>
 int main(int argc, char *argv[]) {
-  Config config;
+  Web::Config config;
   config.parse_arg(argc, argv);
-  
 }
