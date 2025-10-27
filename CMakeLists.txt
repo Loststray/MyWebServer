@@ -24,6 +24,13 @@ add_custom_target(
     COMMENT "Formatting source files using clang-format"
 )
 
+add_custom_target(
+    run
+    COMMAND $<TARGET_FILE:WebServer>
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "running server"
+)
+
 # Tests
 enable_testing()
 find_package(Threads REQUIRED)

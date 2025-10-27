@@ -14,7 +14,7 @@ namespace Web {
 WebServer::WebServer(int port, int trigMode, int timeoutMS, bool OptLinger,
                      const char *dbName, int connPoolNum, int threadNum,
                      bool closelog, int logQueSize)
-    : port_(port), openLinger_(OptLinger), timeoutMS_(timeoutMS) {
+    : port_(port), openLinger_(OptLinger), timeoutMS_(timeoutMS),isClose_(false) {
   srcDir_ = getcwd(nullptr, 256);
   assert(srcDir_);
   strncat(srcDir_, "/resource/", 16);
@@ -24,6 +24,7 @@ WebServer::WebServer(int port, int trigMode, int timeoutMS, bool OptLinger,
   threadpool_ = std::make_unique<ThreadPool>(threadNum);
   epoller_ = std::make_unique<Epoller>();
   timer_ = std::make_unique<HeapTimer>();
+  Logger::init("log", closelog, 50000, logQueSize);
   InitEventMode_(trigMode);
 
   if (!InitSocket_()) {
@@ -31,7 +32,6 @@ WebServer::WebServer(int port, int trigMode, int timeoutMS, bool OptLinger,
   }
 
   if (!closelog) {
-    Logger::init("log", closelog, 50000, logQueSize);
     if (isClose_) {
       LOG_ERROR("========== Server init error!==========");
     } else {
@@ -45,6 +45,7 @@ WebServer::WebServer(int port, int trigMode, int timeoutMS, bool OptLinger,
                threadNum);
     }
   }
+  Logger::get_instance()->flush();
 }
 
 WebServer::~WebServer() {
@@ -259,14 +260,14 @@ bool WebServer::InitSocket_() {
 
   ret = bind(listenFd_, (struct sockaddr *)&addr, sizeof(addr));
   if (ret < 0) {
-    LOG_ERROR("Bind Port:%d error!", port_);
+    LOG_ERROR("Bind Port:{} error!", port_);
     close(listenFd_);
     return false;
   }
 
   ret = listen(listenFd_, 6);
   if (ret < 0) {
-    LOG_ERROR("Listen port:%d error!", port_);
+    LOG_ERROR("Listen port:{} error!", port_);
     close(listenFd_);
     return false;
   }
@@ -277,7 +278,7 @@ bool WebServer::InitSocket_() {
     return false;
   }
   SetFdNonblock(listenFd_);
-  LOG_INFO("Server port:%d", port_);
+  LOG_INFO("Server port:{}", port_);
   return true;
 }
 
